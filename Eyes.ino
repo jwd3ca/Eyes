@@ -5,6 +5,8 @@
 #include <HardwareSerial.h>
 #include <Adafruit_SHT31.h>
 #include "config.h"
+#include <WiFi.h>
+#include <HTTPClient.h>
 
 // Create an SHT31 object
 Adafruit_SHT31 sht30 = Adafruit_SHT31();
@@ -34,12 +36,22 @@ const unsigned long blinkDuration = 250;  // Total blink duration
   //: 0-3, 0 is best, 3 is bad
 
 int pm1_0 = 0;
-
-int iterations = 0;
+int pm2_5 = 0;
+int pm10 = 0;
+int point3sum = 0;
+int point5sum = 0;
+int point10sum = 0;
 
 float temperature = 0;
 float humidity = 0;
+
+int iterations = 0;
+
 int pupilColor = 0x000000;
+
+const unsigned long eventTime_1_post = 60000;  // interval in ms
+unsigned long previousTime_1 = 0;
+
 
 //===================================================================
 void setup() {
@@ -51,6 +63,15 @@ void setup() {
 
   Serial.println("M5Unified Initialized!");
   delay(500);
+
+  // Connect to WiFi
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to WiFi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println(" Connected!");
 
   // Try creating a 320x240 sprite
   EyesSprite.setPsram(true);          // force using psram
@@ -106,6 +127,9 @@ void loop() {
   EyesSprite.fillSprite(TFT_BLACK);  // Clear screen before drawing
   updateDisplay(comfortLevel);
   EyesSprite.pushSprite(0, 0);  // Update display
+
+  sendToInfluxDB();
+  // delay(60000);  // Send data every 60 seconds
 }
 
 //---------------------------------------------------------------------
@@ -188,16 +212,69 @@ bool readPMSData() {
 
       // Assign values to variables
       pm1_0 = values[5];
-      /*
       pm2_5 = values[6];
       pm10 = values[7];
       point3sum = values[8];
       point5sum = values[9];
       point10sum = values[10];
-      */
+
 
       return true;
     }
   }
   return false;
+}
+
+//----------------------------------------------------------------
+void sendToInfluxDB() {
+  unsigned long currentTime = millis();
+
+  if (currentTime - previousTime_1 >= eventTime_1_post) {
+    previousTime_1 = currentTime;
+
+    // Format the data in InfluxDB line protocol
+    String data_low = String("data_point,group=low pm1_0=") + pm1_0 + ",pm2_5=" + pm2_5 + ",pm10=" + pm10;
+    String data_high = String("data_point,group=high point3sum=") + point3sum + ",point5sum=" + point5sum + ",point10sum=" + point10sum;
+    String SHT30string = String("data_point,group=SHT30 temperature=") + temperature + ",humidity=" + humidity;
+    Serial.println();
+    Serial.println(data_low);
+    Serial.println(data_high);
+    Serial.println(SHT30string);
+
+    // Send data to InfluxDB
+    if (WiFi.status() == WL_CONNECTED) {
+      HTTPClient http;
+      String url = String(INFLUXDB_URL) + "?org=" + INFLUXDB_ORG + "&bucket=" + INFLUXDB_BUCKET + "&precision=s";
+      http.begin(url);
+      http.addHeader("Authorization", String("Token ") + INFLUXDB_TOKEN);
+      http.addHeader("Content-Type", "text/plain");
+
+      int httpResponseCode1 = http.POST(data_low);
+      if (httpResponseCode1 > 0) {
+        Serial.printf("Data_low sent successfully! HTTP response code: %d\n", httpResponseCode1);
+      } else {
+        Serial.printf("Error sending data. HTTP response code: %d\n", httpResponseCode1);
+      }
+
+      int httpResponseCode2 = http.POST(data_high);
+      if (httpResponseCode2 > 0) {
+        Serial.printf("Data_high sent successfully! HTTP response code: %d\n", httpResponseCode2);
+      } else {
+        Serial.printf("Error sending data. HTTP response code: %d\n", httpResponseCode2);
+      }
+
+      int httpResponseCode3 = http.POST(SHT30string);
+      if (httpResponseCode3 > 0) {
+        Serial.printf("SHT30string sent successfully! HTTP response code: %d\n", httpResponseCode3);
+      } else {
+        Serial.printf("Error sending data. HTTP response code: %d\n", httpResponseCode3);
+      }
+
+      http.end();
+
+    }  // WL_CONNECTED
+    else {
+      Serial.println("WiFi not connected, cannot send data.");
+    }
+  }
 }
