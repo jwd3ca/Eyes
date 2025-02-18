@@ -13,7 +13,7 @@ Adafruit_SHT31 sht30 = Adafruit_SHT31();
 
 // WIFI_SSID, WIFI_PASSWORD, influxdb credentials, etc. all defined in github-hidden config file
 
-#define MyFont &FreeSansBold24pt7b
+#define MyFont &FreeSansBold9pt7b
 
 #define PMS_RX_PIN 13  // RX from PMS5003
 #define PMS_TX_PIN 14  // TX from PMS5003
@@ -125,12 +125,15 @@ void loop() {
   }
 
   EyesSprite.fillSprite(TFT_BLACK);  // Clear screen before drawing
+  EyesSprite.drawRect(0,0,320,240,pupilColor);
   updateDisplay(comfortLevel);
   EyesSprite.pushSprite(0, 0);  // Update display
 
   sendToInfluxDB();
   // delay(60000);  // Send data every 60 seconds
 }
+
+int eyeOffset = 0;
 
 //---------------------------------------------------------------------
 void updateDisplay(int comfortLevel) {
@@ -145,6 +148,20 @@ void updateDisplay(int comfortLevel) {
 
   if (isBlinking && (currentMillis - blinkStartTime >= blinkDuration)) {
     isBlinking = false;
+
+    // choose eyeOffset randomly
+    int choice = random(1, 4); // upper bound is exclusive!
+    switch (choice) {
+      case 1:
+        eyeOffset = 15;
+        break;
+      case 2:
+        eyeOffset = -15;
+        break;
+      case 3:
+        eyeOffset = 0;
+        break;
+    }
   }
 
   int eyelidHeight = isBlinking ? 120 : comfortLevel * 40;
@@ -158,10 +175,11 @@ void updateDisplay(int comfortLevel) {
 void drawEyes(int eyelidHeight) {
   const int leftEyeX = 94;
   const int rightEyeX = 222;
-  const int eyeY = 128;
-  const int eyeRadius = 60;
-  const int pupilSize = 25;
-  const int eyeVerticalRadius = eyeRadius * 1.6;  // Make eyes longer vertically
+  const int eyeY = 118;
+  const int eyeRadius = 63; // 70 more puts eyes closer together
+  const int pupilSize = 35;
+  const int eyeVerticalRadius = eyeRadius * 1.4;  // Make eyes longer vertically
+  char buff[10];
 
   EyesSprite.fillEllipse(leftEyeX, eyeY, eyeRadius, eyeVerticalRadius, 0x61c4db);
   EyesSprite.fillEllipse(rightEyeX, eyeY, eyeRadius, eyeVerticalRadius, 0x61c4db);
@@ -169,13 +187,27 @@ void drawEyes(int eyelidHeight) {
   // pupils
 
   // Draw left pupil slightly to the right of the center for cartoonish effect
-  EyesSprite.fillCircle(leftEyeX + 10, eyeY, pupilSize, pupilColor);
+  EyesSprite.fillCircle(leftEyeX  + eyeOffset, eyeY, pupilSize, pupilColor);
   // Draw right pupil slightly to the left of the center for cartoonish effect
-  EyesSprite.fillCircle(rightEyeX - 10, eyeY, pupilSize, pupilColor);
+  EyesSprite.fillCircle(rightEyeX + eyeOffset, eyeY, pupilSize, pupilColor);
 
   // Top of the eyelid is based on the vertical radius
   int eyeTop = eyeY - eyeVerticalRadius;
   EyesSprite.fillRect(0, eyeTop - 30, 340, eyelidHeight, TFT_BLACK);
+
+
+   // Set text properties for the string
+  EyesSprite.setTextColor(TFT_BLACK);
+  EyesSprite.setFreeFont(MyFont);  // Set custom font
+  EyesSprite.setTextDatum(MC_DATUM);
+
+  // Draw the text at the center of the pupils
+  snprintf(buff, sizeof(buff), "%.1f C", temperature);
+  EyesSprite.drawString(buff, leftEyeX + eyeOffset, eyeY);
+
+  snprintf(buff, sizeof(buff), "%d %%", int(humidity + 0.5f));
+  EyesSprite.drawString(buff, rightEyeX + eyeOffset, eyeY);
+
 }
 
 //===================================================================
