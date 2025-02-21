@@ -176,7 +176,7 @@ void drawEyes(int eyelidHeight) {
   const int leftEyeX = 94;
   const int rightEyeX = 222;
   const int eyeY = 118;
-  const int eyeRadius = 63; // 70 more puts eyes closer together
+  const int eyeRadius = 65; // 70 more puts eyes closer together
   const int pupilSize = 35;
   const int eyeVerticalRadius = eyeRadius * 1.4;  // Make eyes longer vertically
   char buff[10];
@@ -207,6 +207,12 @@ void drawEyes(int eyelidHeight) {
 
   snprintf(buff, sizeof(buff), "%d %%", int(humidity + 0.5f));
   EyesSprite.drawString(buff, rightEyeX + eyeOffset, eyeY);
+
+  // draw the 1.0 count at the top of the sprite
+  
+    snprintf(buff, sizeof(buff), "%d ", pm1_0);
+    EyesSprite.setTextColor(pupilColor);
+    EyesSprite.drawString(buff, 155, 22);
 
 }
 
