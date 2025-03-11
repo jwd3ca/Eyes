@@ -1,4 +1,4 @@
-// Just test fullscreen sprite M5Core2
+// Arduino/Gits/Eyes/Eyes.ino
 
 #include <M5Unified.h>
 #include <Adafruit_GFX.h>  // Needed for sprites! Ensure this is included
@@ -53,18 +53,14 @@ float humidity = 0;
 int iterations = 0;
 
 int pupilColor = 0x000000;
+int eyeOffset = 0;
+
+int currentValue = 10;             // Initial value
+int previousValue = currentValue;  // Store the initial value
+int crashCounter;
 
 const unsigned long eventTime_1_post = 60000;  // interval in ms
 unsigned long previousTime_1 = 0;
-
-const char* userKey = "YOUR_USER_KEY";
-const char* apiToken = "ajrv7y3tsksuixeqsb6k7cbr9311fc";
-
-#define PUSHOVER_API_TOKEN "ajrv7y3tsksuixeqsb6k7cbr9311fc"  // Replace with your API token
-#define PUSHOVER_USER_KEY "ucnsm7rxw1kxmjjaru8aogrdpfs4r6"   // Replace with your user key
-
-ESP_SSLClient ssl_client;
-WiFiClient basic_client;
 
 //===================================================================
 void setup() {
@@ -109,11 +105,9 @@ void setup() {
   }
 }
 
-//====================================================================
-int currentValue = 10;             // Initial value
-int previousValue = currentValue;  // Store the initial value
-int crashCounter;
 
+
+//====================================================================
 void loop() {
   int comfortLevel;
   int crashLimit = 20000;
@@ -126,7 +120,7 @@ void loop() {
   if (currentValue != 0 && currentValue == previousValue) {
     ++crashCounter;  // crashed?
   }
-    previousValue = currentValue;
+  previousValue = currentValue;
 
   if (crashCounter >= crashLimit) {
     Serial.printf("crashCounter is %d\n", crashCounter);
@@ -139,7 +133,7 @@ void loop() {
 
   // comfortLevel: 0-3, 0 is best, 3 is bad
 
-  // pm1_0 = 40;
+  // pm1_0 = 40; // for testing colours
 
   if (pm1_0 > 151) {
     comfortLevel = 3;
@@ -161,10 +155,8 @@ void loop() {
   EyesSprite.pushSprite(0, 0);  // Update display
 
   sendToInfluxDB();
-  // delay(60000);  // Send data every 60 seconds
+  // Sends data every 60 seconds using millis
 }
-
-int eyeOffset = 0;
 
 //---------------------------------------------------------------------
 void updateDisplay(int comfortLevel) {
@@ -303,7 +295,6 @@ bool readPMSData() {
       point5sum = values[9];
       point10sum = values[10];
 
-
       return true;
     }
   }
@@ -366,8 +357,9 @@ void sendToInfluxDB() {
 
 //----------------------------------------------------------------
 void send_to_pushover() {
-
   char String_buffer[128];
+  ESP_SSLClient ssl_client;
+  WiFiClient basic_client;
 
   ssl_client.setInsecure();
   ssl_client.setBufferSizes(1024, 512);
