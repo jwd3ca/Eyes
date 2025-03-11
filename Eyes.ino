@@ -36,7 +36,9 @@ unsigned long nextBlinkTime = 0;
 bool isBlinking = false;
 unsigned long blinkStartTime = 0;
 const unsigned long blinkDuration = 250;  // Total blink duration
-  //: 0-3, 0 is best, 3 is bad
+int eyeY = 118;
+
+//: 0-3, 0 is best, 3 is bad
 
 int pm1_0 = 0;
 int pm2_5 = 0;
@@ -110,17 +112,26 @@ void setup() {
 //====================================================================
 int currentValue = 10;             // Initial value
 int previousValue = currentValue;  // Store the initial value
+int crashCounter;
+
 void loop() {
   int comfortLevel;
+  int crashLimit = 10;
 
   readPMSData();
-  // Serial.printf("PM1_0 : %d µg/m³\n", pm1_0);
 
   currentValue = pm1_0;
+  // Serial.printf("currentValue: %d, previousValue: %d \n", currentValue, previousValue);
 
-  if (currentValue == previousValue) {  // probably crashed
+  if (currentValue != 0 && currentValue == previousValue) {
+    ++crashCounter;  // crashed?
+  }
+  previousValue = currentValue;
+
+  if (crashCounter >= crashLimit) {
+    Serial.printf("crashCounter is %d\n", crashCounter);
     send_to_pushover();
-    previousValue = currentValue;
+    crashCounter = 0;
   }
 
   get_SHT30data();
@@ -159,7 +170,6 @@ int eyeOffset = 0;
 void updateDisplay(int comfortLevel) {
   unsigned long currentMillis = millis();
 
-
   if (currentMillis >= nextBlinkTime && !isBlinking) {
     isBlinking = true;
     blinkStartTime = currentMillis;
@@ -170,16 +180,36 @@ void updateDisplay(int comfortLevel) {
     isBlinking = false;
 
     // choose eyeOffset randomly
-    int choice = random(1, 4);  // upper bound is exclusive!
+    int choice = random(1, 8);  // upper bound is exclusive!
+    Serial.printf("choice is %d\n", choice);
     switch (choice) {
-      case 1:
+      case 1:  // look right
         eyeOffset = 15;
+        eyeY = 118;
         break;
-      case 2:
+      case 2:  // look left
         eyeOffset = -15;
+        eyeY = 118;
         break;
-      case 3:
+      case 3:  // look center
         eyeOffset = 0;
+        eyeY = 118;
+        break;
+      case 4:  // look up & right
+        eyeOffset = 15;
+        eyeY = 90;
+        break;
+      case 5:  // look down & right
+        eyeOffset = 15;
+        eyeY = 140;
+        break;
+      case 6:  // look up & left
+        eyeOffset = -15;
+        eyeY = 90;
+        break;
+      case 7:  // look down & left
+        eyeOffset = -15;
+        eyeY = 140;
         break;
     }
   }
@@ -188,48 +218,46 @@ void updateDisplay(int comfortLevel) {
 
   if (comfortLevel == 3) eyelidHeight = 85;  // Almost closed
 
-  drawEyes(eyelidHeight);
+  drawEyes(eyelidHeight, eyeY);
 }
 
+
 //---------------------------------------------------------------------
-void drawEyes(int eyelidHeight) {
+void drawEyes(int eyelidHeight, int eyeY) {
   const int leftEyeX = 94;
   const int rightEyeX = 222;
-  const int eyeY = 118;
+
   const int eyeRadius = 65;  // 70 more puts eyes closer together
   const int pupilSize = 35;
   const int eyeVerticalRadius = eyeRadius * 1.4;  // Make eyes longer vertically
   char buff[10];
 
-  EyesSprite.fillEllipse(leftEyeX, eyeY, eyeRadius, eyeVerticalRadius, 0x61c4db);
-  EyesSprite.fillEllipse(rightEyeX, eyeY, eyeRadius, eyeVerticalRadius, 0x61c4db);
+  EyesSprite.fillEllipse(leftEyeX, 118, eyeRadius, eyeVerticalRadius, 0x61c4db);
+  EyesSprite.fillEllipse(rightEyeX, 118, eyeRadius, eyeVerticalRadius, 0x61c4db);
 
-  // pupils
-
-  // Draw left pupil slightly to the right of the center for cartoonish effect
+  // pupils:
+  // display left pupil slightly to the right of the center for cartoonish effect
   EyesSprite.fillCircle(leftEyeX + eyeOffset, eyeY, pupilSize, pupilColor);
-  // Draw right pupil slightly to the left of the center for cartoonish effect
+  // display right pupil slightly to the left of the center for cartoonish effect
   EyesSprite.fillCircle(rightEyeX + eyeOffset, eyeY, pupilSize, pupilColor);
 
   // Top of the eyelid is based on the vertical radius
   int eyeTop = eyeY - eyeVerticalRadius;
   EyesSprite.fillRect(0, eyeTop - 30, 340, eyelidHeight, TFT_BLACK);
 
-
   // Set text properties for the string
   EyesSprite.setTextColor(TFT_BLACK);
   EyesSprite.setFreeFont(MyFont);  // Set custom font
   EyesSprite.setTextDatum(MC_DATUM);
 
-  // Draw the text at the center of the pupils
+  // display the text at the center of the pupils
   snprintf(buff, sizeof(buff), "%.1f C", temperature);
   EyesSprite.drawString(buff, leftEyeX + eyeOffset, eyeY);
 
   snprintf(buff, sizeof(buff), "%d %%", int(humidity + 0.5f));
   EyesSprite.drawString(buff, rightEyeX + eyeOffset, eyeY);
 
-  // draw the 1.0 count at the top of the sprite
-
+  // display the pm1_0 count at the top of the sprite
   snprintf(buff, sizeof(buff), "%d ", pm1_0);
   EyesSprite.setTextColor(pupilColor);
   EyesSprite.drawString(buff, 155, 22);
@@ -338,6 +366,9 @@ void sendToInfluxDB() {
 
 //----------------------------------------------------------------
 void send_to_pushover() {
+
+  char String_buffer[128];
+
   ssl_client.setInsecure();
   ssl_client.setBufferSizes(1024, 512);
   ssl_client.setDebugLevel(0);
@@ -347,12 +378,15 @@ void send_to_pushover() {
   Serial.println("---------------------------------");
   Serial.print("Connecting to Pushover...");
 
+  snprintf(String_buffer, sizeof(String_buffer), "currentValue: %d, previousValue: %d \n", currentValue, previousValue);
+
   // Construct JSON payload using ArduinoJson
   StaticJsonDocument<512> doc;
   doc["token"] = PUSHOVER_API_TOKEN;
   doc["user"] = PUSHOVER_USER_KEY;
-  doc["message"] = "Test message from ESP32!";
-  doc["title"] = "ESP32 Alert";
+  // doc["message"] = "Test message from ESP32!";
+  doc["message"] = String_buffer;
+  doc["title"] = "Air Quaility Crash Alert";
 
   String payload;
   serializeJson(doc, payload);
