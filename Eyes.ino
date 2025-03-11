@@ -108,11 +108,20 @@ void setup() {
 }
 
 //====================================================================
+int currentValue = 10;             // Initial value
+int previousValue = currentValue;  // Store the initial value
 void loop() {
   int comfortLevel;
 
   readPMSData();
   // Serial.printf("PM1_0 : %d µg/m³\n", pm1_0);
+
+  currentValue = pm1_0;
+
+  if (currentValue == previousValue) {  // probably crashed
+    send_to_pushover();
+    previousValue = currentValue;
+  }
 
   get_SHT30data();
   // Serial.printf("temperature: %.2f, humidity: %.2f\n",temperature, humidity );
@@ -136,7 +145,7 @@ void loop() {
   }
 
   EyesSprite.fillSprite(TFT_BLACK);  // Clear screen before drawing
-  EyesSprite.drawRect(0,0,320,240,pupilColor);
+  EyesSprite.drawRect(0, 0, 320, 240, pupilColor);
   updateDisplay(comfortLevel);
   EyesSprite.pushSprite(0, 0);  // Update display
 
@@ -161,7 +170,7 @@ void updateDisplay(int comfortLevel) {
     isBlinking = false;
 
     // choose eyeOffset randomly
-    int choice = random(1, 4); // upper bound is exclusive!
+    int choice = random(1, 4);  // upper bound is exclusive!
     switch (choice) {
       case 1:
         eyeOffset = 15;
@@ -187,7 +196,7 @@ void drawEyes(int eyelidHeight) {
   const int leftEyeX = 94;
   const int rightEyeX = 222;
   const int eyeY = 118;
-  const int eyeRadius = 65; // 70 more puts eyes closer together
+  const int eyeRadius = 65;  // 70 more puts eyes closer together
   const int pupilSize = 35;
   const int eyeVerticalRadius = eyeRadius * 1.4;  // Make eyes longer vertically
   char buff[10];
@@ -198,7 +207,7 @@ void drawEyes(int eyelidHeight) {
   // pupils
 
   // Draw left pupil slightly to the right of the center for cartoonish effect
-  EyesSprite.fillCircle(leftEyeX  + eyeOffset, eyeY, pupilSize, pupilColor);
+  EyesSprite.fillCircle(leftEyeX + eyeOffset, eyeY, pupilSize, pupilColor);
   // Draw right pupil slightly to the left of the center for cartoonish effect
   EyesSprite.fillCircle(rightEyeX + eyeOffset, eyeY, pupilSize, pupilColor);
 
@@ -207,7 +216,7 @@ void drawEyes(int eyelidHeight) {
   EyesSprite.fillRect(0, eyeTop - 30, 340, eyelidHeight, TFT_BLACK);
 
 
-   // Set text properties for the string
+  // Set text properties for the string
   EyesSprite.setTextColor(TFT_BLACK);
   EyesSprite.setFreeFont(MyFont);  // Set custom font
   EyesSprite.setTextDatum(MC_DATUM);
@@ -220,11 +229,10 @@ void drawEyes(int eyelidHeight) {
   EyesSprite.drawString(buff, rightEyeX + eyeOffset, eyeY);
 
   // draw the 1.0 count at the top of the sprite
-  
-    snprintf(buff, sizeof(buff), "%d ", pm1_0);
-    EyesSprite.setTextColor(pupilColor);
-    EyesSprite.drawString(buff, 155, 22);
 
+  snprintf(buff, sizeof(buff), "%d ", pm1_0);
+  EyesSprite.setTextColor(pupilColor);
+  EyesSprite.drawString(buff, 155, 22);
 }
 
 //===================================================================
@@ -328,6 +336,7 @@ void sendToInfluxDB() {
   }
 }
 
+//----------------------------------------------------------------
 void send_to_pushover() {
   ssl_client.setInsecure();
   ssl_client.setBufferSizes(1024, 512);
@@ -378,4 +387,3 @@ void send_to_pushover() {
 
   Serial.println();
 }
-
