@@ -116,7 +116,7 @@ int crashCounter;
 
 void loop() {
   int comfortLevel;
-  int crashLimit = 10;
+  int crashLimit = 20000;
 
   readPMSData();
 
@@ -126,7 +126,7 @@ void loop() {
   if (currentValue != 0 && currentValue == previousValue) {
     ++crashCounter;  // crashed?
   }
-  previousValue = currentValue;
+    previousValue = currentValue;
 
   if (crashCounter >= crashLimit) {
     Serial.printf("crashCounter is %d\n", crashCounter);
@@ -181,7 +181,7 @@ void updateDisplay(int comfortLevel) {
 
     // choose eyeOffset randomly
     int choice = random(1, 8);  // upper bound is exclusive!
-    Serial.printf("choice is %d\n", choice);
+    // Serial.printf("choice is %d\n", choice);
     switch (choice) {
       case 1:  // look right
         eyeOffset = 15;
@@ -242,7 +242,7 @@ void drawEyes(int eyelidHeight, int eyeY) {
   EyesSprite.fillCircle(rightEyeX + eyeOffset, eyeY, pupilSize, pupilColor);
 
   // Top of the eyelid is based on the vertical radius
-  int eyeTop = eyeY - eyeVerticalRadius;
+  int eyeTop = 118 - eyeVerticalRadius;
   EyesSprite.fillRect(0, eyeTop - 30, 340, eyelidHeight, TFT_BLACK);
 
   // Set text properties for the string
