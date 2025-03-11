@@ -3,10 +3,13 @@
 #include <M5Unified.h>
 #include <Adafruit_GFX.h>  // Needed for sprites! Ensure this is included
 #include <HardwareSerial.h>
+#include <ArduinoJson.h>
 #include <Adafruit_SHT31.h>
 #include "config.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <ESP_SSLClient.h>
+#include <ArduinoJson.h>  // Include ArduinoJson library
 
 // Create an SHT31 object
 Adafruit_SHT31 sht30 = Adafruit_SHT31();
@@ -52,6 +55,14 @@ int pupilColor = 0x000000;
 const unsigned long eventTime_1_post = 60000;  // interval in ms
 unsigned long previousTime_1 = 0;
 
+const char* userKey = "YOUR_USER_KEY";
+const char* apiToken = "ajrv7y3tsksuixeqsb6k7cbr9311fc";
+
+#define PUSHOVER_API_TOKEN "ajrv7y3tsksuixeqsb6k7cbr9311fc"  // Replace with your API token
+#define PUSHOVER_USER_KEY "ucnsm7rxw1kxmjjaru8aogrdpfs4r6"   // Replace with your user key
+
+ESP_SSLClient ssl_client;
+WiFiClient basic_client;
 
 //===================================================================
 void setup() {
@@ -316,3 +327,55 @@ void sendToInfluxDB() {
     }
   }
 }
+
+void send_to_pushover() {
+  ssl_client.setInsecure();
+  ssl_client.setBufferSizes(1024, 512);
+  ssl_client.setDebugLevel(0);
+  ssl_client.setSessionTimeout(120);
+  ssl_client.setClient(&basic_client);
+
+  Serial.println("---------------------------------");
+  Serial.print("Connecting to Pushover...");
+
+  // Construct JSON payload using ArduinoJson
+  StaticJsonDocument<512> doc;
+  doc["token"] = PUSHOVER_API_TOKEN;
+  doc["user"] = PUSHOVER_USER_KEY;
+  doc["message"] = "Test message from ESP32!";
+  doc["title"] = "ESP32 Alert";
+
+  String payload;
+  serializeJson(doc, payload);
+
+  if (ssl_client.connect("api.pushover.net", 443)) {
+    Serial.println(" ok");
+    Serial.println("Send POST request to Pushover...");
+    ssl_client.print("POST /1/messages.json HTTP/1.1\r\n");
+    ssl_client.print("Host: api.pushover.net\r\n");
+    ssl_client.print("Content-Type: application/json\r\n");
+    ssl_client.print("Content-Length: ");
+    ssl_client.print(payload.length());
+    ssl_client.print("\r\n\r\n");
+    ssl_client.print(payload);
+
+    Serial.print("Read response...");
+
+    unsigned long ms = millis();
+    while (!ssl_client.available() && millis() - ms < 3000) {
+      delay(0);
+    }
+    Serial.println();
+
+    while (ssl_client.available()) {
+      Serial.print((char)ssl_client.read());
+    }
+    Serial.println();
+  } else
+    Serial.println(" failed\n");
+
+  ssl_client.stop();
+
+  Serial.println();
+}
+
