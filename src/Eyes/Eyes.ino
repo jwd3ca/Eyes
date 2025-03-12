@@ -235,7 +235,9 @@ void drawEyes(int eyelidHeight, int eyeY) {
 
   // Top of the eyelid is based on the vertical radius
   int eyeTop = 118 - eyeVerticalRadius;
-  EyesSprite.fillRect(0, eyeTop - 30, 340, eyelidHeight, TFT_BLACK);
+  // now blink
+  // EyesSprite.fillRect(10, eyeTop - 30, 290, eyelidHeight, TFT_BLACK);
+  EyesSprite.fillRect(10, eyeTop, 290, eyelidHeight, TFT_BLACK);
 
   // Set text properties for the string
   EyesSprite.setTextColor(TFT_BLACK);
