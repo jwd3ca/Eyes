@@ -58,6 +58,7 @@ int eyeOffset = 0;
 int currentValue = 10;             // Initial value
 int previousValue = currentValue;  // Store the initial value
 int crashCounter;
+int crashLimit = 25000;
 
 const unsigned long eventTime_1_post = 60000;  // interval in ms
 unsigned long previousTime_1 = 0;
@@ -110,7 +111,6 @@ void setup() {
 //====================================================================
 void loop() {
   int comfortLevel;
-  int crashLimit = 20000;
 
   readPMSData();
 
@@ -372,7 +372,7 @@ void send_to_pushover() {
   Serial.println("---------------------------------");
   Serial.print("Connecting to Pushover...");
 
-  snprintf(String_buffer, sizeof(String_buffer), "currentValue: %d, previousValue: %d \n", currentValue, previousValue);
+  snprintf(String_buffer, sizeof(String_buffer), "crashLimit (%d) exceeded\n", crashLimit);
 
   // Construct JSON payload using ArduinoJson
   StaticJsonDocument<512> doc;
